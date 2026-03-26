@@ -65,8 +65,54 @@ jobs:
           name: ${{ matrix.typeface }}
           path: /home/runner/work/zenbones-mono/Iosevka/dist/${{ matrix.typeface }}/*.zip
 
-  release:
+  nerd-font:
     needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download Zenbones-Brainy artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: Zenbones-Brainy
+          path: artifacts
+
+      - name: Extract TTFs
+        run: unzip artifacts/Zenbones-Brainy-TTF.zip -d artifacts
+
+      - name: Install FontForge
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y fontforge
+
+      - name: Clone Nerd Fonts font-patcher
+        run: |
+          git clone --filter=blob:none --sparse https://github.com/ryanoasis/nerd-fonts.git
+          cd nerd-fonts
+          git sparse-checkout add font-patcher src/glyphs
+
+      - name: Patch fonts with Nerd Font glyphs
+        run: |
+          mkdir -p patched
+          for ttf in artifacts/TTF/*.ttf; do
+            fontforge -script nerd-fonts/font-patcher \
+              --complete \
+              --careful \
+              --outputdir patched \
+              "$ttf"
+          done
+
+      - name: Zip patched fonts
+        run: |
+          cd patched
+          zip -r ../Zenbones-Brainy-NerdFont-TTF.zip *.ttf
+
+      - name: Upload Nerd Font artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Zenbones-Brainy-NerdFont
+          path: Zenbones-Brainy-NerdFont-TTF.zip
+
+  release:
+    needs: [build, nerd-font]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
